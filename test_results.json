@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-06 11:40:51",
+  "timestamp": "2026-05-06 12:47:42",
   "total_scenarios": 4,
   "overall_precision": 0.8,
   "overall_recall": 1.0,
@@ -35,8 +35,8 @@
         "Port_Scan"
       ],
       "actual": [
-        "Port_Scan",
-        "DDoS"
+        "DDoS",
+        "Port_Scan"
       ],
       "TP": 1,
       "FP": 1,
@@ -47,12 +47,12 @@
     {
       "scenario": "Mixed Traffic (DDoS + Port Scan)",
       "expected": [
-        "Port_Scan",
-        "DDoS"
+        "DDoS",
+        "Port_Scan"
       ],
       "actual": [
-        "Port_Scan",
-        "DDoS"
+        "DDoS",
+        "Port_Scan"
       ],
       "TP": 2,
       "FP": 0,
