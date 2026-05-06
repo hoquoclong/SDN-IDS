@@ -31,6 +31,9 @@ TIMEOUT = 10
 MIN_TRAFFIC_VOL = 50       # Ngưỡng tối thiểu tổng packets để phân tích
 ENTROPY_THRESHOLD = 1.0    # Ngưỡng cảnh báo DDoS
 
+# Cấu hình phát hiện Port Scan
+PORT_SCAN_THRESHOLD = 10   # Ngưỡng số lượng dst port khác nhau để cảnh báo
+
 # ============================================================================
 # HÀM TIỆN ÍCH
 # ============================================================================
@@ -66,6 +69,7 @@ def parse_flows(raw_flows):
         match = flow.get("match", {})
         src = match.get("ipv4_src")
         dst = match.get("ipv4_dst")
+        dst_port = match.get("tcp_dst")
 
         if not src or not dst:
             continue
@@ -73,6 +77,7 @@ def parse_flows(raw_flows):
         parsed.append({
             "src": src,
             "dst": dst,
+            "dst_port": int(dst_port) if dst_port else None,
             "pkts": flow.get("packet_count", 0),
             "bytes": flow.get("byte_count", 0),
         })
@@ -178,6 +183,28 @@ def analyze_ddos(sliding_window):
     print(f"{'═' * 65}")
 
 
+def analyze_port_scan(flows):
+    """Phát hiện Port Scan dựa trên số lượng dst port khác nhau từ cùng 1 src IP."""
+    # Gom nhóm dst_port theo src_ip
+    src_dst_ports = defaultdict(set)
+
+    for flow in flows:
+        src = flow.get("src")
+        dst_port = flow.get("dst_port")
+
+        if src and dst_port:
+            src_dst_ports[src].add(dst_port)
+
+    # Phát hiện port scan
+    for src_ip, ports in src_dst_ports.items():
+        if len(ports) >= PORT_SCAN_THRESHOLD:
+            print(f"\n{'═' * 65}")
+            print(f"  [PORT SCAN DETECTED] Nguồn: {src_ip}")
+            print(f"  Số lượng cổng đích quét: {len(ports)} (Ngưỡng: {PORT_SCAN_THRESHOLD})")
+            print(f"  Danh sách cổng: {sorted(ports)}")
+            print(f"  Khuyến nghị: Block IP {src_ip}")
+            print(f"{'═' * 65}")
+
 # ============================================================================
 # VÒNG LẶP CHÍNH
 # ============================================================================
@@ -191,12 +218,15 @@ def main():
     print(f" Cửa sổ trượt               : 4 chu kỳ ({4 * POLL_INTERVAL}s)")
     print(f" Ngưỡng Entropy             : {ENTROPY_THRESHOLD}")
     print(f" Ngưỡng Traffic tối thiểu   : {MIN_TRAFFIC_VOL} pkts")
+    print(f" Ngưỡng Port Scan           : {PORT_SCAN_THRESHOLD} ports")
     print("═" * 65 + "\n")
 
     # Trạng thái lưu packet_count của chu kỳ trước
     previous_state = {}
     # Cửa sổ trượt lưu delta packets của 4 chu kỳ gần nhất
     sliding_window = deque(maxlen=4)
+    # Cửa sổ trượt lưu flows cho port scan detection
+    flow_window = deque(maxlen=4)
 
     try:
         while True:
@@ -210,9 +240,17 @@ def main():
                 delta, previous_state = compute_delta_packets(parsed, previous_state)
                 sliding_window.append(delta)
 
-                # Phân tích entropy khi cửa sổ đã đầy
+                # Lưu flows vào cửa sổ trượt cho port scan
+                flow_window.append(parsed)
+
+                # Phân tích khi cửa sổ đã đầy
                 if len(sliding_window) == 4:
                     analyze_ddos(sliding_window)
+                    # Gom tất cả flows trong cửa sổ để phát hiện port scan
+                    all_flows = []
+                    for flows in flow_window:
+                        all_flows.extend(flows)
+                    analyze_port_scan(all_flows)
                 else:
                     log(f"Đang nạp dữ liệu...({len(sliding_window)}/4 chu kỳ)")
 

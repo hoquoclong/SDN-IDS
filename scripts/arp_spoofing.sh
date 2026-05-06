@@ -8,7 +8,7 @@
 VICTIM_IP="10.0.0.1"
 
 # Khai báo địa chỉ IP hợp lệ (Benign Host) mà Attacker muốn mạo danh
-SPOOFED_IP="10.0.0.11" 
+SPOOFED_IP="10.0.0.2" 
 
 # Tự động trích xuất tên giao diện mạng ảo của Attacker trong Mininet
 # Logic: Tìm kiếm giao diện có định dạng h_atk[số]-eth0
