@@ -6,9 +6,18 @@ ids_detector.py - Module thu thập và phân tích luồng dữ liệu SDN
 import time
 import requests
 import math
-    
+     
 from datetime import datetime
 from collections import defaultdict, deque
+
+# Import module mitigation để tự động chặn attacker
+try:
+    from mitigation import block_ip, log as mitig_log
+    MITIGATION_ENABLED = True
+except ImportError:
+    MITIGATION_ENABLED = False
+    def block_ip(*args, **kwargs): pass
+    def mitig_log(*args, **kwargs): pass
 
 # ============================================================================
 # CẤU HÌNH HỆ THỐNG
@@ -156,6 +165,13 @@ def analyze_ddos(sliding_window):
         for ip, pkts in sorted_ips[:5]:
             ratio = pkts / total_packets * 100
             print(f"  {ip:<20} {pkts:>10,} {ratio:>9.1f}%")
+
+        # Tự động chặn các IP nghi ngờ (top 3)
+        if MITIGATION_ENABLED:
+            suspicious_ips = [ip for ip, _ in sorted_ips[:3]]
+            print(f"  Đang chặn các IP nghi ngờ: {suspicious_ips}")
+            for ip, _ in sorted_ips[:3]:
+                block_ip(ip)
     else:
         print(f"   Trạng thái: BÌNH THƯỜNG")
 
