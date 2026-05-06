@@ -9,11 +9,10 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 - [Tính năng](#tính-năng)
 - [Công nghệ sử dụng](#công-nghệ-sử-dụng)
-- [Cài đặt](#cài-dặt)
+- [Cài đặt](#cài-đặt)
 - [Cấu trúc dự án](#cấu-trúc-dự-án)
 - [Hướng dẫn chạy](#hướng-dẫn-chạy)
 - [Kiểm thử & Kết quả](#kiểm-thử--kết-quả)
-- [Giảng viên](#giảng-viên)
 
 ---
 
