@@ -205,6 +205,11 @@ def analyze_port_scan(flows):
             print(f"  Khuyến nghị: Block IP {src_ip}")
             print(f"{'═' * 65}")
 
+            # Tự động chặn IP port scan
+            if MITIGATION_ENABLED:
+                print(f"  Đang chặn IP {src_ip}...")
+                block_ip(src_ip)
+
 # ============================================================================
 # VÒNG LẶP CHÍNH
 # ============================================================================
