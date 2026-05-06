@@ -206,20 +206,5 @@ def calculate_entropy(ip_packet_counts):
 
 ---
 
-## 🎓 Giảng viên
-
-**Học phần:** SDN (Software-Defined Networking)  
-**Năm học:** 2025-2026  
-**Yêu cầu đề tài:** Phát hiện và chặn DDoS, Port Scan, ARP Spoofing trong mạng SDN  
-**Công nghệ:** Mininet, Ryu Controller, Python3
-
----
-
-## 📜 License
-
-Dự án phục vụ mục đích học tập. Mọi thắc mắc xin liên hệ qua GitHub Issues.
-
----
-
 **Tác giả:** hoquoclong  
 **Repo:** https://github.com/hoquoclong/SDN-IDS
