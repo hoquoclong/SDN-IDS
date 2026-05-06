@@ -20,6 +20,26 @@ except ImportError:
     def mitig_log(*args, **kwargs): pass
 
 # ============================================================================
+# CẤU HÌNH ALERT LOG
+# ============================================================================
+
+ALERT_LOG_FILE = "alerts.log"
+
+def write_alert_log(alert_data):
+    """
+    Ghi alert vào file alerts.log (append mode, JSON format).
+    
+    Args:
+        alert_data: dict chứa thông tin alert
+    """
+    import json
+    try:
+        with open(ALERT_LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(alert_data, ensure_ascii=False) + '\n')
+    except IOError as e:
+        log(f"Lỗi ghi alert log: {e}", is_error=True)
+
+# ============================================================================
 # CẤU HÌNH HỆ THỐNG
 # ============================================================================
 
@@ -170,6 +190,17 @@ def analyze_ddos(sliding_window):
         for ip, pkts in sorted_ips[:5]:
             ratio = pkts / total_packets * 100
             print(f"  {ip:<20} {pkts:>10,} {ratio:>9.1f}%")
+        
+        # Ghi alert log
+        alert_data = {
+            "timestamp": get_time(),
+            "attack_type": "DDoS",
+            "attacker_ips": [{"ip": ip, "packets": pkts} for ip, pkts in sorted_ips[:3]],
+            "total_packets": total_packets,
+            "entropy": round(entropy, 4),
+            "message": f"DDoS detected! Entropy={entropy:.4f}"
+        }
+        write_alert_log(alert_data)
 
         # Tự động chặn các IP nghi ngờ (top 3)
         if MITIGATION_ENABLED:
@@ -209,6 +240,17 @@ def analyze_port_scan(flows):
             if MITIGATION_ENABLED:
                 print(f"  Đang chặn IP {src_ip}...")
                 block_ip(src_ip)
+        
+        # Ghi alert log cho port scan
+        alert_data = {
+            "timestamp": get_time(),
+            "attack_type": "Port_Scan",
+            "attacker_ip": src_ip,
+            "ports_scanned": sorted(list(ports)),
+            "num_ports": len(ports),
+            "message": f"Port Scan detected from {src_ip}: {len(ports)} ports"
+        }
+        write_alert_log(alert_data)
 
 # ============================================================================
 # VÒNG LẶP CHÍNH

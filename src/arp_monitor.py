@@ -88,9 +88,18 @@ class ARPMonitor(app_manager.RyuApp):
                 "src_ip": src_ip,
                 "src_mac": src_mac,
                 "trusted_mac": trusted_mac,
+                "message": f"ARP Spoofing! IP {src_ip} has MAC {src_mac} (expected {trusted_mac})"
             }
             alerts.append(alert)
             self.logger.warning(f"ARP Spoofing: {alert}")
+            
+            # Ghi vào file alerts.log
+            try:
+                import json
+                with open("alerts.log", "a", encoding="utf-8") as f:
+                    f.write(json.dumps(alert, ensure_ascii=False) + "\n")
+            except IOError:
+                self.logger.error("Failed to write ARP alert to log file")
 
     def get_alerts(self):
         return alerts
