@@ -143,7 +143,4 @@ h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.2
 - File `alerts.log`: Xem toàn bộ alerts (JSON format)
 - Ryu console: Xem ARP Spoofing alerts
 
----
 
-**Tác giả:** hoquoclong  
-**Repo:** https://github.com/hoquoclong/SDN-IDS
