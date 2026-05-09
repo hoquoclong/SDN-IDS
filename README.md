@@ -5,18 +5,17 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 📋 Mục lục
+## Mục lục
 
 - [Tính năng](#tính-năng)
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
+- [Công nghệ](#công-nghệ-sử-dụng)
 - [Cài đặt](#cài-đặt)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Cấu trúc](#cấu-trúc-dự-án)
 - [Hướng dẫn chạy](#hướng-dẫn-chạy)
-- [Kiểm thử & Kết quả](#kiểm-thử--kết-quả)
 
 ---
 
-## ✅ Tính năng
+## Tính năng
 
 ### 1. Topology Mininet
 - 1 Victim (`h_vic`, 10.0.0.1)
@@ -35,8 +34,8 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ### 3. Mitigation (Tự động chặn)
 - Gửi **Flow-Mod** đến switch để DROP traffic từ attacker IP
-- Thời gian chặn: 300 giây (5 phút) mỗi lần phát hiện
-- Tự động chặn top 3 IP nghi ngờ (DDoS) hoặc IP quét port (Port Scan)
+- Thời gian chặn: 300 giây (5 phút) - có thể thay đổi trong `src/mitigation.py` (`BLOCK_DURATION`)
+- Tự động chặn top 3 IP nghi ngờ nhất (DDoS) hoặc IP quét port (Port Scan)
 
 ### 4. Alert Log
 - Ghi log vào file `alerts.log` (JSON format)
@@ -44,7 +43,7 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 🛠 Công nghệ sử dụng
+## Công nghệ sử dụng
 
 - **Mininet**: Tạo topology mạng ảo
 - **Ryu Controller**: 
@@ -56,7 +55,7 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 📦 Cài đặt
+## Cài đặt
 
 ```bash
 # Cài đặt Mininet (nếu chưa có)
@@ -75,7 +74,7 @@ cd SDN-IDS
 
 ---
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
 ```
 SDN-IDS/
@@ -98,7 +97,7 @@ SDN-IDS/
 
 ---
 
-## 🚀 Hướng dẫn chạy
+## Hướng dẫn chạy
 
 ### Bước 1: Khởi động Ryu Controller
 ```bash
