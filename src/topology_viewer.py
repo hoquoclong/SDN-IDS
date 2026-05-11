@@ -6,7 +6,7 @@ Chạy: python3 src/topology_viewer.py
 
 import requests
 import json
-from tabulate import tabulate
+
 
 RYU_URL = "http://127.0.0.1:8080"
 

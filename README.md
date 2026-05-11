@@ -27,25 +27,33 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## Cài đặt
+## Cài đặt (Ubuntu Server 22.04)
 
+### 1. Cài đặt hệ thống
 ```bash
-# Cài đặt Mininet
-sudo apt-get install mininet
+sudo apt-get update
+sudo apt-get install -y mininet hping3 nmap dsniff git curl
+```
 
-# Cài đặt hping3, nmap, dsniff (arpspoof)
-sudo apt-get install hping3 nmap dsniff
+### 2. Cài đặt uv (Python package manager)
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.cargo/env
+```
 
-# Clone repo
+### 3. Clone và cài đặt project
+```bash
 git clone https://github.com/hoquoclong/SDN-IDS.git
 cd SDN-IDS
 
 # Tạo virtual environment Python 3.8
 uv venv --python 3.8 .venv
 
-# Kích hoạt venv và cài đặt dependencies
+# Kích hoạt venv
 source .venv/bin/activate
-python -m pip install ryu==4.34 eventlet==0.30.2 requests
+
+# Cài đặt dependencies
+python3 -m pip install ryu==4.34 eventlet==0.30.2 requests
 ```
 
 ---
@@ -116,6 +124,7 @@ ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
 ```
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
+- **Giữ terminal này mở**
 
 ### Bước 3: Khởi động Mininet Topology (terminal mới)
 ```bash
@@ -123,6 +132,7 @@ sudo python3 src/topology.py
 ```
 - Tự động tạo 16 hosts + 1 switch
 - Kiểm tra kết nối đến victim (10.0.0.1)
+- **Giữ terminal này mở**
 
 ### Bước 4: Xem Topology (terminal mới)
 ```bash
@@ -142,10 +152,11 @@ python3 src/ids_detector.py
 - Polling mỗi 5 giây lấy flow stats
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
 - Tự động chặn attacker qua Flow-Mod
+- **Giữ terminal này mở**
 
-### Bước 6: Sinh tấn công (để test)
+### Bước 6: Sinh tấn công (trong Mininet CLI)
 
-**DDoS (trong Mininet CLI):**
+**DDoS:**
 ```bash
 h_atk1 hping3 -S --flood -V -p 80 10.0.0.1
 ```
