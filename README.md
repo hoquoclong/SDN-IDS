@@ -85,6 +85,7 @@ SDN-IDS/
 ├── pyproject.toml            # Cấu hình uv project
 ├── src/
 │   ├── topology.py          # Tạo mạng Mininet
+│   ├── topology_viewer.py   # Xem topo qua Ryu REST API
 │   ├── ids_detector.py      # IDS chính: polling, DDoS, Port Scan detection
 │   ├── mitigation.py        # Module chặn IP (Flow-Mod drop)
 │   ├── arp_monitor.py       # Ryu app phát hiện ARP Spoofing
@@ -113,7 +114,17 @@ sudo python3 src/topology.py
 - Tự động tạo 16 hosts + 1 switch
 - Kiểm tra kết nối đến victim (10.0.0.1)
 
-### Bước 3: Chạy IDS Detector
+### Bước 3: Xem Topology (GUI)
+```bash
+python3 src/topology_viewer.py
+```
+- Xem topo qua **Ryu REST API** (bảng điều khiển dạng text)
+- Hoặc truy cập trực tiếp qua trình duyệt:
+  - `http://127.0.0.1:8080/v1.0/topology` - Xem topo JSON
+  - `http://127.0.0.1:8080/stats/switches` - Danh sách switch
+  - `http://127.0.0.1:8080/stats/flow/1` - Flow entries
+
+### Bước 4: Chạy IDS Detector
 ```bash
 python3 src/ids_detector.py
 ```
@@ -121,7 +132,7 @@ python3 src/ids_detector.py
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
 - Tự động chặn attacker qua Flow-Mod
 
-### Bước 4: Sinh tấn công (để test)
+### Bước 5: Sinh tấn công (để test)
 
 **DDoS (mở terminal mới trong Mininet CLI):**
 ```bash
@@ -138,7 +149,7 @@ h_atk2 nmap -p 1-1000 10.0.0.1
 h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.2
 ```
 
-### Bước 5: Kiểm tra kết quả
+### Bước 6: Kiểm tra kết quả
 - IDS console: Xem alert realtime
 - File `alerts.log`: Xem toàn bộ alerts (JSON format)
 - Ryu console: Xem ARP Spoofing alerts
