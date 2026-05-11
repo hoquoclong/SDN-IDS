@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 arp_monitor.py - Ryu app phát hiện ARP Spoofing
-Chạy: ryu-manager arp_monitor.py ryu.app.ofctl_rest
+Chạy: ryu-manager arp_monitor.py ryu.app.ofctl_rest ryu.app.rest.topology
 """
 
 from ryu.base import app_manager
