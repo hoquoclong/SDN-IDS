@@ -21,7 +21,7 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
   - `ryu.app.ofctl_rest` (REST API để lấy flow stats)
   - `ryu.app.simple_switch_13` (switch l2 cơ bản)
   - `src/arp_monitor.py` (ARP Spoofing detection)
-- **Python 3.8+**
+- **Python 3.8** (bắt buộc)
 - **eventlet 0.30.2** (tương thích với Ryu)
 - **Tools**: `hping3` (DDoS), `nmap` (Port Scan), `arpspoof` (ARP Spoofing)
 
@@ -32,16 +32,24 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 ### 1. Cài đặt hệ thống
 ```bash
 sudo apt-get update
-sudo apt-get install -y mininet hping3 nmap dsniff git curl
+sudo apt-get install -y mininet hping3 nmap dsniff git curl software-properties-common
 ```
 
-### 2. Cài đặt uv (Python package manager)
+### 2. Cài đặt Python 3.8
+```bash
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt-get update
+sudo apt-get install -y python3.8 python3.8-venv python3.8-dev
+python3.8 --version
+```
+
+### 3. Cài đặt uv (Python package manager)
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source ~/.cargo/env
 ```
 
-### 3. Clone và cài đặt project
+### 4. Clone và cài đặt project
 ```bash
 git clone https://github.com/hoquoclong/SDN-IDS.git
 cd SDN-IDS
@@ -53,7 +61,7 @@ uv venv --python 3.8 .venv
 source .venv/bin/activate
 
 # Cài đặt dependencies
-python3 -m pip install ryu==4.34 eventlet==0.30.2 requests
+python3.8 -m pip install ryu==4.34 eventlet==0.30.2 requests
 ```
 
 ---
@@ -114,13 +122,13 @@ SDN-IDS/
 
 ### Bước 1: Kích hoạt Virtual Environment
 ```bash
-cd SDN-IDS
+cd ~/SDN-IDS
 source .venv/bin/activate
 ```
 
 ### Bước 2: Khởi động Ryu Controller
 ```bash
-ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
+.venv/bin/ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
 ```
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
@@ -128,7 +136,7 @@ ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
 
 ### Bước 3: Khởi động Mininet Topology (terminal mới)
 ```bash
-sudo python3 src/topology.py
+sudo python3.8 src/topology.py
 ```
 - Tự động tạo 16 hosts + 1 switch
 - Kiểm tra kết nối đến victim (10.0.0.1)
@@ -137,7 +145,7 @@ sudo python3 src/topology.py
 ### Bước 4: Xem Topology (terminal mới)
 ```bash
 # Cách 1: Dùng script xem topo
-python3 src/topology_viewer.py
+python3.8 src/topology_viewer.py
 
 # Cách 2: Truy cập trực tiếp qua trình duyệt
 # http://127.0.0.1:8080/v1.0/topology - Xem topo JSON
@@ -147,7 +155,7 @@ python3 src/topology_viewer.py
 
 ### Bước 5: Chạy IDS Detector (terminal mới)
 ```bash
-python3 src/ids_detector.py
+python3.8 src/ids_detector.py
 ```
 - Polling mỗi 5 giây lấy flow stats
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
