@@ -5,18 +5,17 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 📋 Mục lục
+## Mục lục
 
 - [Tính năng](#tính-năng)
-- [Công nghệ sử dụng](#công-nghệ-sử-dụng)
+- [Công nghệ](#công-nghệ-sử-dụng)
 - [Cài đặt](#cài-đặt)
-- [Cấu trúc dự án](#cấu-trúc-dự-án)
+- [Cấu trúc](#cấu-trúc-dự-án)
 - [Hướng dẫn chạy](#hướng-dẫn-chạy)
-- [Kiểm thử & Kết quả](#kiểm-thử--kết-quả)
 
 ---
 
-## ✅ Tính năng
+## Tính năng
 
 ### 1. Topology Mininet
 - 1 Victim (`h_vic`, 10.0.0.1)
@@ -35,8 +34,8 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ### 3. Mitigation (Tự động chặn)
 - Gửi **Flow-Mod** đến switch để DROP traffic từ attacker IP
-- Thời gian chặn: 300 giây (5 phút) mỗi lần phát hiện
-- Tự động chặn top 3 IP nghi ngờ (DDoS) hoặc IP quét port (Port Scan)
+- Thời gian chặn: 300 giây (5 phút) - có thể thay đổi trong `src/mitigation.py` (`BLOCK_DURATION`)
+- Tự động chặn top 3 IP nghi ngờ nhất (DDoS) hoặc IP quét port (Port Scan)
 
 ### 4. Alert Log
 - Ghi log vào file `alerts.log` (JSON format)
@@ -44,7 +43,7 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 🛠 Công nghệ sử dụng
+## Công nghệ sử dụng
 
 - **Mininet**: Tạo topology mạng ảo
 - **Ryu Controller**: 
@@ -56,7 +55,7 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 
 ---
 
-## 📦 Cài đặt
+## Cài đặt
 
 ```bash
 # Cài đặt Mininet (nếu chưa có)
@@ -75,7 +74,7 @@ cd SDN-IDS
 
 ---
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
 ```
 SDN-IDS/
@@ -98,11 +97,11 @@ SDN-IDS/
 
 ---
 
-## 🚀 Hướng dẫn chạy
+## Hướng dẫn chạy
 
 ### Bước 1: Khởi động Ryu Controller
 ```bash
-ryu-manager src/arp_monitor.py ryu.app.ofctl_rest ryu.app.simple_switch_13
+ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
 ```
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
@@ -144,66 +143,4 @@ h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.2
 - File `alerts.log`: Xem toàn bộ alerts (JSON format)
 - Ryu console: Xem ARP Spoofing alerts
 
----
 
-## 📊 Kiểm thử & Kết quả
-
-### Chạy test Precision/Recall
-```bash
-python3 src/test_ids.py
-```
-
-### Kết quả đo lường (4 kịch bản test)
-
-| Kịch bản | Expected | Detected | Precision | Recall |
-|-----------|----------|-----------|-----------|--------|
-| Normal Traffic | Không | Không | 1.000 | 1.000 |
-| DDoS Attack | DDoS | DDoS | 1.000 | 1.000 |
-| Port Scan | Port_Scan | Port_Scan (+ DDoS FP) | 0.500 | 1.000 |
-| Mixed (DDoS + Port Scan) | Cả 2 | Cả 2 | 1.000 | 1.000 |
-
-**Tổng thể:**
-- **Precision:** 0.800
-- **Recall:** 1.000
-- **F1-Score:** 0.889
-
-> Lưu ý: Port Scan test có False Positive do DDoS detection nhạy cảm với traffic tập trung từ 1 IP. Có thể điều chỉnh ENTROPY_THRESHOLD để cải thiện.
-
----
-
-## 📝 Comment code
-
-Toàn bộ code đều có **docstring** và **comment đầy đủ** theo chuẩn Python:
-- Mỗi function đều có docstring mô tả chức năng, tham số, giá trị trả về
-- Các đoạn code phức tạp đều có inline comments
-- Tên biến, hàm có ý nghĩa, dễ hiểu
-
-Ví dụ:
-```python
-def calculate_entropy(ip_packet_counts):
-    """
-    Tính Shannon Entropy từ phân bố packet theo IP nguồn.
-    
-    Args:
-        ip_packet_counts: dict {ip: packet_count}
-    
-    Returns:
-        float: Giá trị entropy (0.0 - log2(N))
-    """
-    total = sum(ip_packet_counts.values())
-    if total == 0:
-        return 0.0
-    # Tính entropy: H = -Σ(p * log2(p))
-    entropy = 0.0
-    for count in ip_packet_counts.values():
-        if count <= 0:
-            continue
-        p = count / total
-        entropy -= p * math.log2(p)
-    return entropy
-```
-
----
-
-**Tác giả:** hoquoclong  
-**Repo:** https://github.com/hoquoclong/SDN-IDS
