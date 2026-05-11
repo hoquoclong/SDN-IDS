@@ -39,29 +39,29 @@ sudo apt-get install -y mininet hping3 nmap dsniff git curl software-properties-
 ```bash
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get update
-sudo apt-get install -y python3.8 python3.8-venv python3.8-dev
-python3.8 --version
+sudo apt-get install -y python3.8 python3.8-venv python3.8-dev python3.8-distutils
 ```
 
-### 3. Cài đặt uv (Python package manager)
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.cargo/env
-```
-
-### 4. Clone và cài đặt project
+### 3. Clone và cài đặt project
 ```bash
 git clone https://github.com/hoquoclong/SDN-IDS.git
 cd SDN-IDS
 
 # Tạo virtual environment Python 3.8
-uv venv --python 3.8 .venv
+python3.8 -m venv .venv
 
 # Kích hoạt venv
 source .venv/bin/activate
 
+# Nâng cấp pip
+python3.8 -m ensurepip
+python3.8 -m pip install --upgrade pip
+
 # Cài đặt dependencies
 python3.8 -m pip install ryu==4.34 eventlet==0.30.2 requests
+
+# Kiểm tra cài đặt
+ryu-manager --version
 ```
 
 ---
@@ -73,7 +73,7 @@ SDN-IDS/
 ├── README.md                   # File này
 ├── alerts.log                 # File log alert (tự động tạo)
 ├── test_results.json          # Kết quả Precision/Recall
-├── pyproject.toml            # Cấu hình uv project
+├── pyproject.toml            # Cấu hình project
 ├── .venv/                    # Virtual environment (Python 3.8)
 ├── src/
 │   ├── topology.py          # Tạo mạng Mininet
@@ -128,7 +128,7 @@ source .venv/bin/activate
 
 ### Bước 2: Khởi động Ryu Controller
 ```bash
-.venv/bin/ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
+ryu-manager src/arp_monitor.py ryu.app.ofctl_rest
 ```
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
@@ -144,14 +144,13 @@ sudo python3.8 src/topology.py
 
 ### Bước 4: Xem Topology (terminal mới)
 ```bash
-# Cách 1: Dùng script xem topo
 python3.8 src/topology_viewer.py
-
-# Cách 2: Truy cập trực tiếp qua trình duyệt
-# http://127.0.0.1:8080/v1.0/topology - Xem topo JSON
-# http://127.0.0.1:8080/stats/switches - Danh sách switch
-# http://127.0.0.1:8080/stats/flow/1 - Flow entries
 ```
+
+Hoặc truy cập trực tiếp qua trình duyệt:
+- `http://127.0.0.1:8080/v1.0/topology` - Xem topo JSON
+- `http://127.0.0.1:8080/stats/switches` - Danh sách switch
+- `http://127.0.0.1:8080/stats/flow/1` - Flow entries
 
 ### Bước 5: Chạy IDS Detector (terminal mới)
 ```bash
