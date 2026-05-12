@@ -128,7 +128,7 @@ source .venv/bin/activate
 
 ### Bước 2: Khởi động Ryu Controller
 ```bash
-ryu-manager src/arp_monitor.py ryu.app.ofctl_rest ryu.app.rest.topology
+ryu-manager src/arp_monitor.py ryu.app.ofctl_rest ryu.app.rest_topology
 ```
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
