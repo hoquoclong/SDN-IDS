@@ -12,11 +12,18 @@ RYU_URL = "http://127.0.0.1:8080"
 
 def get_topology():
     try:
-        res = requests.get(f"{RYU_URL}/v1.0/topology", timeout=5)
-        res.raise_for_status()
-        return res.json()
+        res_sw = requests.get(f"{RYU_URL}/v1.0/topology/switches", timeout=5)
+        res_sw.raise_for_status()
+        
+        res_link = requests.get(f"{RYU_URL}/v1.0/topology/links", timeout=5)
+        res_link.raise_for_status()
+        
+        return {
+            "switches": res_sw.json(),
+            "links": res_link.json()
+        }
     except requests.exceptions.RequestException as e:
-        print(f"Lỗi kết nối Ryu: {e}")
+        print(f"Loi ket noi Ryu: {e}")
         return None
 
 def get_switches():

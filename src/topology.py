@@ -3,6 +3,7 @@
 topology.py - Mô hình mạng Mininet cho đề tài SDN-IDS
 """
 
+import time
 from mininet.cli import CLI
 from mininet.log import info, setLogLevel
 from mininet.net import Mininet
@@ -132,6 +133,9 @@ def ids_topology():
 	info("*** Xay dung va khoi dong mang\n")
 	net.build()
 	net.start()
+
+	info("*** Dang cho Switch s1 ket noi voi Ryu Controller (3s)...\n")
+	time.sleep(3)
 
 	# 5. In Port Mapping
 	info('\nPort mapping tren Switch s1:\n')

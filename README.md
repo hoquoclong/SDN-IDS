@@ -30,12 +30,14 @@ Phát hiện các loại tấn công: **DDoS**, **Port Scan**, **ARP Spoofing**.
 ## Cài đặt (Ubuntu Server 22.04)
 
 ### 1. Cài đặt hệ thống
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y mininet hping3 nmap dsniff git curl software-properties-common
 ```
 
 ### 2. Cài đặt Python 3.8
+
 ```bash
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get update
@@ -43,6 +45,7 @@ sudo apt-get install -y python3.8 python3.8-venv python3.8-dev python3.8-distuti
 ```
 
 ### 3. Clone và cài đặt project
+
 ```bash
 git clone https://github.com/hoquoclong/SDN-IDS.git
 cd SDN-IDS
@@ -57,8 +60,20 @@ source .venv/bin/activate
 python3.8 -m ensurepip
 python3.8 -m pip install --upgrade pip
 
-# Cài đặt dependencies
-python3.8 -m pip install ryu==4.34 eventlet==0.30.2 requests
+# Cài đặt các thư viện cần thiết
+python3.8 -m pip install eventlet==0.30.2 requests
+
+# Clone dự án mã nguồn Ryu từ GitHub và cài đặt
+cd ~
+git clone https://github.com/faucetsdn/ryu.git
+cd ryu
+python3.8 -m pip install .
+
+# Quay lại thư mục dự án SDN-IDS
+cd ~/SDN-IDS
+
+# Sửa lỗi mất thư mục giao diện Web GUI của Ryu (nếu có)
+cp -r ~/ryu/ryu/app/gui_topology/html .venv/lib/python3.8/site-packages/ryu/app/gui_topology/
 
 # Kiểm tra cài đặt
 ryu-manager --version
@@ -93,6 +108,7 @@ SDN-IDS/
 ## Tính năng
 
 ### 1. Topology Mininet
+
 - 1 Victim (`h_vic`, 10.0.0.1)
 - 5 Benign hosts (`h_ben1` - `h_ben5`, 10.0.0.11 - 10.0.0.15)
 - 10 Attacker hosts (`h_atk1` - `h_atk10`, 10.0.0.21 - 10.0.0.30)
@@ -101,18 +117,20 @@ SDN-IDS/
 
 ### 2. Phát hiện tấn công
 
-| Loại tấn công | Phương pháp phát hiện | Ngưỡng phát hiện |
-|--------------|---------------------|-------------------|
-| **DDoS** | Tính **Shannon Entropy** của IP nguồn (cửa sổ 4 chu kỳ × 5s) | Entropy < 1.0 |
-| **Port Scan** | Đếm số **dst port khác nhau** từ 1 src IP | > 10 ports |
-| **ARP Spoofing** | So sánh **MAC-IP** trong ARP packet với bảng tin cậy | MAC không khớp |
+| Loại tấn công    | Phương pháp phát hiện                                        | Ngưỡng phát hiện |
+| ---------------- | ------------------------------------------------------------ | ---------------- |
+| **DDoS**         | Tính **Shannon Entropy** của IP nguồn (cửa sổ 4 chu kỳ × 5s) | Entropy < 1.0    |
+| **Port Scan**    | Đếm số **dst port khác nhau** từ 1 src IP                    | > 10 ports       |
+| **ARP Spoofing** | So sánh **MAC-IP** trong ARP packet với bảng tin cậy         | MAC không khớp   |
 
 ### 3. Mitigation (Tự động chặn)
+
 - Gửi **Flow-Mod** đến switch để DROP traffic từ attacker IP
 - Thời gian chặn: 300 giây (5 phút) - có thể thay đổi trong `src/mitigation.py` (`BLOCK_DURATION`)
 - Tự động chặn top 3 IP nghi ngờ nhất (DDoS) hoặc IP quét port (Port Scan)
 
 ### 4. Alert Log
+
 - Ghi log vào file `alerts.log` (JSON format)
 - Thông tin: timestamp, attack_type, attacker_ip, traffic volume, message
 
@@ -121,41 +139,50 @@ SDN-IDS/
 ## Hướng dẫn chạy
 
 ### Bước 1: Kích hoạt Virtual Environment
+
 ```bash
 cd ~/SDN-IDS
 source .venv/bin/activate
 ```
 
 ### Bước 2: Khởi động Ryu Controller
+
 ```bash
-ryu-manager src/arp_monitor.py ryu.app.ofctl_rest ryu.app.rest_topology
+ryu-manager ryu.app.simple_switch_13 ryu.app.gui_topology.gui_topology src/arp_monitor.py ryu.app.ofctl_rest ryu.app.rest_topology
 ```
+
 - API endpoint: `http://127.0.0.1:8080`
 - ARP Monitor sẽ load bảng tin cậy và lắng nghe ARP packets
 - **Giữ terminal này mở**
 
 ### Bước 3: Khởi động Mininet Topology (terminal mới)
+
 ```bash
 sudo python3.8 src/topology.py
 ```
+
 - Tự động tạo 16 hosts + 1 switch
 - Kiểm tra kết nối đến victim (10.0.0.1)
 - **Giữ terminal này mở**
 
 ### Bước 4: Xem Topology (terminal mới)
+
 ```bash
 python3.8 src/topology_viewer.py
 ```
 
 Hoặc truy cập trực tiếp qua trình duyệt:
+
 - `http://127.0.0.1:8080/v1.0/topology` - Xem topo JSON
 - `http://127.0.0.1:8080/stats/switches` - Danh sách switch
 - `http://127.0.0.1:8080/stats/flow/1` - Flow entries
 
 ### Bước 5: Chạy IDS Detector (terminal mới)
+
 ```bash
 python3.8 src/ids_detector.py
 ```
+
 - Polling mỗi 5 giây lấy flow stats
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
 - Tự động chặn attacker qua Flow-Mod
@@ -164,23 +191,28 @@ python3.8 src/ids_detector.py
 ### Bước 6: Sinh tấn công (trong Mininet CLI)
 
 **DDoS:**
+
 ```bash
 h_atk1 hping3 -S --flood -V -p 80 10.0.0.1
 ```
 
 **Port Scan:**
+
 ```bash
 h_atk2 nmap -p 1-1000 10.0.0.1
 ```
 
 **ARP Spoofing:**
+
 ```bash
 h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.2
 ```
 
 ### Bước 7: Kiểm tra kết quả
+
 - IDS console: Xem alert realtime
 - File `alerts.log`: Xem toàn bộ alerts (JSON format)
 - Ryu console: Xem ARP Spoofing alerts
 
 ---
+
