@@ -1,3 +1,0 @@
-{"timestamp": "2026-05-06 11:36:51", "attack_type": "DDoS_Test", "attacker_ips": [{"ip": "10.0.0.21", "packets": 1000}], "total_packets": 5000, "entropy": 0.8, "message": "DDoS detected in test"}
-{"timestamp": "2026-05-06 11:36:51", "attack_type": "Port_Scan", "attacker_ip": "10.0.0.22", "ports_scanned": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], "num_ports": 14, "message": "Port Scan detected from 10.0.0.22: 14 ports"}
-{"timestamp": "2026-05-06 12:47:19", "attack_type": "Test_Alert_Log", "message": "Testing alert log functionality"}
