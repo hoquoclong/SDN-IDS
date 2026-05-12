@@ -38,7 +38,7 @@ def get_flows(dpid):
     try:
         res = requests.get(f"{RYU_URL}/stats/flow/{dpid}", timeout=5)
         res.raise_for_status()
-        return res.json().get(dpid, [])
+        return res.json().get(str(dpid), [])
     except:
         return []
 
@@ -46,7 +46,7 @@ def get_ports(dpid):
     try:
         res = requests.get(f"{RYU_URL}/stats/port/{dpid}", timeout=5)
         res.raise_for_status()
-        return res.json().get(dpid, [])
+        return res.json().get(str(dpid), [])
     except:
         return []
 
@@ -66,32 +66,57 @@ def display_topology():
 
     print(f"\n[Switches] {len(switches)} switch(es)")
     for sw in switches:
-        dpid = sw.get("dpid")
+        raw_dpid = sw.get("dpid")
+        dpid = int(raw_dpid, 16) if isinstance(raw_dpid, str) else raw_dpid
+        
         ports = get_ports(dpid)
-        print(f"  - Switch dpid={dpid} | ports={len([p for p in ports if p.get('port_no', 0) > 0])}")
+        valid_ports = 0
+        for p in ports:
+            try:
+                if int(p.get('port_no', 0)) > 0:
+                    valid_ports += 1
+            except (ValueError, TypeError):
+                pass
+                
+        print(f"  - Switch dpid={dpid} | ports={valid_ports}")
 
     print(f"\n[Links] {len(links)} link(s)")
     for link in links:
         src = link.get("src")
         dst = link.get("dst")
         if src and dst:
-            print(f"  - Switch:{src.get('dpid')} port:{src.get('port_no')} <-> Switch:{dst.get('dpid')} port:{dst.get('port_no')}")
+            src_dpid = int(src.get('dpid'), 16) if isinstance(src.get('dpid'), str) else src.get('dpid')
+            dst_dpid = int(dst.get('dpid'), 16) if isinstance(dst.get('dpid'), str) else dst.get('dpid')
+            print(f"  - Switch:{src_dpid} port:{src.get('port_no')} <-> Switch:{dst_dpid} port:{dst.get('port_no')}")
 
     print(f"\n[Hosts] Tren switches:")
     for sw in switches:
-        dpid = sw.get("dpid")
+        raw_dpid = sw.get("dpid")
+        dpid = int(raw_dpid, 16) if isinstance(raw_dpid, str) else raw_dpid
+        
         flows = get_flows(dpid)
         hosts = set()
         for f in flows:
             match = f.get("match", {})
-            ipv4_src = match.get("ipv4_src")
-            ipv4_dst = match.get("ipv4_dst")
-            if ipv4_src:
-                hosts.add(ipv4_src)
-            if ipv4_dst:
-                hosts.add(ipv4_dst)
+            # OpenFlow 1.3 usually uses eth_src, eth_dst
+            # Nhưng ryu simple_switch_13 luu MAC trong dl_src/dl_dst (OF1.0) hoac eth_src/eth_dst (OF1.3)
+            macs = []
+            if "eth_src" in match: macs.append(match["eth_src"])
+            if "eth_dst" in match: macs.append(match["eth_dst"])
+            if "dl_src" in match: macs.append(match["dl_src"])
+            if "dl_dst" in match: macs.append(match["dl_dst"])
+            
+            for mac in macs:
+                if mac.startswith("00:00:00:00:00:"):
+                    suffix = int(mac.split(":")[-1])
+                    hosts.add(f"10.0.0.{suffix} ({mac})")
+                    
         if hosts:
-            print(f"  Switch {dpid}: {sorted(hosts)}")
+            # Sort IPs properly
+            sorted_hosts = sorted(list(hosts), key=lambda x: int(x.split()[0].split('.')[-1]))
+            print(f"  Switch {dpid}:")
+            for h in sorted_hosts:
+                print(f"    - {h}")
 
     print("\n" + "=" * 60)
     print("Truy cap Web GUI: http://127.0.0.1:8080")
