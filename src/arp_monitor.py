@@ -72,12 +72,17 @@ class ARPMonitor(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Table miss flow: gửi packets unknown đến controller
-        match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                          ofproto.OFPCML_NO_BUFFER)]
+
+        # Luôn đưa ARP lên controller để phát hiện spoofing kể cả khi switch đã học MAC.
+        arp_match = parser.OFPMatch(eth_type=0x0806)
+        self.add_flow(datapath, 10, arp_match, actions)
+
+        # Table miss flow: gửi packets unknown đến controller
+        match = parser.OFPMatch()
         self.add_flow(datapath, 0, match, actions)
-        self.logger.info("Switch %s connected - Table miss flow installed", datapath.id)
+        self.logger.info("Switch %s connected - ARP monitor and table miss flows installed", datapath.id)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, ev):
