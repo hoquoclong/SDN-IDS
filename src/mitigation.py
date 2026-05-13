@@ -57,10 +57,11 @@ def block_ip(src_ip, dpid=DEFAULT_DPID):
     flow_mod = {
         "dpid": dpid,
         "match": {
+            "eth_type": 2048,
             "ipv4_src": src_ip
         },
         "actions": [],  # Empty actions = DROP
-        "priority": 100,
+        "priority": 65535,
         "idle_timeout": BLOCK_DURATION,
         "hard_timeout": 0
     }
@@ -91,6 +92,7 @@ def unblock_ip(src_ip, dpid=DEFAULT_DPID):
     flow_mod = {
         "dpid": dpid,
         "match": {
+            "eth_type": 2048,
             "ipv4_src": src_ip
         }
     }
