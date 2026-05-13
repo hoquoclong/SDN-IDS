@@ -35,6 +35,22 @@ TRUSTED = {
 alerts = []
 
 
+def get_time():
+    """Trả về chuỗi thời gian hiện tại."""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def mac_to_ip(mac):
+    """Suy luận IP lab từ MAC Mininet có octet cuối trùng IP."""
+    if not mac or not mac.startswith("00:00:00:00:00:"):
+        return None
+    try:
+        suffix = int(mac.split(":")[-1])
+    except ValueError:
+        return None
+    return f"10.0.0.{suffix}"
+
+
 class ARPMonitor(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
@@ -80,26 +96,55 @@ class ARPMonitor(app_manager.RyuApp):
         src_mac = arp_pkt.src_mac
 
         trusted_mac = TRUSTED.get(src_ip)
+        attacker_ip = mac_to_ip(src_mac)
 
-        if trusted_mac and src_mac.lower() != trusted_mac.lower():
-            alert = {
-                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "type": "ARP_SPOOFING",
-                "src_ip": src_ip,
-                "src_mac": src_mac,
-                "trusted_mac": trusted_mac,
-                "message": f"ARP Spoofing! IP {src_ip} has MAC {src_mac} (expected {trusted_mac})"
-            }
-            alerts.append(alert)
-            self.logger.warning(f"ARP Spoofing: {alert}")
-            
-            # Ghi vào file alerts.log
-            try:
-                import json
-                with open("alerts.log", "a", encoding="utf-8") as f:
-                    f.write(json.dumps(alert, ensure_ascii=False) + "\n")
-            except IOError:
-                self.logger.error("Failed to write ARP alert to log file")
+        if trusted_mac and src_mac.lower() == trusted_mac.lower():
+            return
+
+        if trusted_mac:
+            alert = self.build_alert(
+                attack_type="ARP_SPOOFING",
+                attacker_ip=attacker_ip,
+                claimed_ip=src_ip,
+                src_mac=src_mac,
+                trusted_mac=trusted_mac,
+                message=f"ARP Spoofing! IP {src_ip} has MAC {src_mac} (expected {trusted_mac})",
+            )
+            self.emit_alert(alert)
+            return
+
+        alert = self.build_alert(
+            attack_type="ARP_UNKNOWN_BINDING",
+            attacker_ip=attacker_ip,
+            claimed_ip=src_ip,
+            src_mac=src_mac,
+            trusted_mac=None,
+            message=f"Unknown ARP binding! IP {src_ip} claims MAC {src_mac} but is not in TRUSTED table",
+        )
+        self.emit_alert(alert)
+
+    def build_alert(self, attack_type, attacker_ip, claimed_ip, src_mac, trusted_mac, message):
+        return {
+            "timestamp": get_time(),
+            "attack_type": attack_type,
+            "attacker_ip": attacker_ip,
+            "claimed_ip": claimed_ip,
+            "src_mac": src_mac,
+            "trusted_mac": trusted_mac,
+            "message": message,
+        }
+
+    def emit_alert(self, alert):
+        alerts.append(alert)
+        self.logger.warning("%s: %s", alert["attack_type"], alert)
+
+        # Ghi vào file alerts.log
+        try:
+            import json
+            with open("alerts.log", "a", encoding="utf-8") as f:
+                f.write(json.dumps(alert, ensure_ascii=False) + "\n")
+        except IOError:
+            self.logger.error("Failed to write ARP alert to log file")
 
     def get_alerts(self):
         return alerts

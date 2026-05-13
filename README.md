@@ -119,9 +119,9 @@ SDN-IDS/
 
 | Loại tấn công    | Phương pháp phát hiện                                        | Ngưỡng phát hiện |
 | ---------------- | ------------------------------------------------------------ | ---------------- |
-| **DDoS**         | Tính **Shannon Entropy** của IP nguồn (cửa sổ 4 chu kỳ × 5s) | Entropy < 1.0    |
-| **Port Scan**    | Đếm số **dst port khác nhau** từ 1 src IP                    | > 10 ports       |
-| **ARP Spoofing** | So sánh **MAC-IP** trong ARP packet với bảng tin cậy         | MAC không khớp   |
+| **DDoS**         | Tính **Shannon Entropy** nguồn/đích (cửa sổ 4 chu kỳ × 5s)   | Entropy thấp + traffic cao |
+| **Port Scan**    | Đếm số **dst port khác nhau** hoặc fallback theo packet-rate | >= 10 ports hoặc 30-500 pps |
+| **ARP Spoofing** | So sánh **MAC-IP** trong ARP packet với bảng tin cậy         | MAC không khớp hoặc IP lạ |
 
 ### 3. Mitigation (Tự động chặn)
 
@@ -186,6 +186,13 @@ python3.8 src/ids_detector.py
 - Polling mỗi 5 giây lấy flow stats
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
 - Tự động chặn attacker qua Flow-Mod
+- Victim/server được bảo vệ mặc định là `10.0.0.1`. Có thể đổi hoặc cấu hình nhiều victim bằng biến môi trường:
+
+```bash
+IDS_PROTECTED_IPS=10.0.0.5 python3.8 src/ids_detector.py
+IDS_PROTECTED_IPS=10.0.0.5,10.0.0.8 python3.8 src/ids_detector.py
+```
+
 - **Giữ terminal này mở**
 
 ### Bước 6: Sinh tấn công (trong Mininet CLI)
@@ -196,23 +203,38 @@ python3.8 src/ids_detector.py
 h_atk1 hping3 -S --flood -V -p 80 10.0.0.1
 ```
 
+Hoặc khi dùng script:
+
+```bash
+TARGET_IP=10.0.0.5 scripts/ddos.sh
+```
+
 **Port Scan:**
 
 ```bash
 h_atk2 nmap -p 1-1000 10.0.0.1
 ```
 
+Hoặc khi dùng script:
+
+```bash
+TARGET_IP=10.0.0.5 TARGET_PORTS=1-1000 scripts/port_scan.sh
+```
+
+Nếu flow stats của Ryu không có `tcp_dst/udp_dst`, IDS sẽ dùng fallback theo tốc độ gói và sinh alert `Suspected_Port_Scan_Rate`.
+
 **ARP Spoofing:**
 
 ```bash
-h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.2
+h_atk3 arpspoof -i h_atk3-eth0 -t 10.0.0.1 10.0.0.11
 ```
+
+Lưu ý: với topology hiện tại, nên spoof một IP có trong bảng tin cậy, ví dụ `10.0.0.11`. Nếu dùng IP ngoài topology như `10.0.0.2`, hệ thống sẽ ghi `ARP_UNKNOWN_BINDING` thay vì `ARP_SPOOFING`.
 
 ### Bước 7: Kiểm tra kết quả
 
-- IDS console: Xem alert realtime
+- IDS console: Xem alert realtime của DDoS/Port Scan
 - File `alerts.log`: Xem toàn bộ alerts (JSON format)
 - Ryu console: Xem ARP Spoofing alerts
 
 ---
-

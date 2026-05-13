@@ -5,10 +5,12 @@
 # Công cụ    : nmap
 # ==============================================================================
 
-TARGET_IP="10.0.0.1"
+TARGET_IP="${TARGET_IP:-10.0.0.1}"
+TARGET_PORTS="${TARGET_PORTS:-1-1000}"
 
 echo "[*] Khởi chạy tiến trình rà quét cổng mạng..."
 echo "[*] Mục tiêu (Target): $TARGET_IP"
+echo "[*] Dải cổng (Ports): $TARGET_PORTS"
 
 # ------------------------------------------------------------------------------
 # Chú giải tham số thực thi:
@@ -17,6 +19,6 @@ echo "[*] Mục tiêu (Target): $TARGET_IP"
 #   -n        : Vô hiệu hóa tính năng phân giải tên miền nhằm tối ưu hiệu năng.
 # ------------------------------------------------------------------------------
 
-nmap -p 1-1000 -T4 -n "$TARGET_IP"
+nmap -p "$TARGET_PORTS" -T4 -n "$TARGET_IP"
 
 echo "[+] Quá trình rà quét đã hoàn tất."

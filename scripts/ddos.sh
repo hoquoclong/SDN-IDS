@@ -5,8 +5,8 @@
 # Công cụ    : hping3
 # ==============================================================================
 
-TARGET_IP="10.0.0.1"
-TARGET_PORT="80"
+TARGET_IP="${TARGET_IP:-10.0.0.1}"
+TARGET_PORT="${TARGET_PORT:-80}"
 
 echo "[*] Khởi chạy mô phỏng tấn công TCP SYN Flood..."
 echo "[*] Nạn nhân (Victim): $TARGET_IP | Cổng dịch vụ (Port): $TARGET_PORT"
