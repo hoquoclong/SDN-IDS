@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDN Topology Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/vis-network@9.1.9/styles/vis-network.min.css">
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef5fb;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #d8e3ef;
+      --accent: #0ea5e9;
+      --danger: #b91c1c;
+      --danger-bg: #fff1f2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(14, 165, 233, 0.11), transparent 38%),
+        linear-gradient(315deg, rgba(34, 197, 94, 0.09), transparent 32%),
+        var(--bg);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 22px;
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .stat {
+      min-width: 96px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      text-align: center;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 18px;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main {
+      position: relative;
+      min-height: 0;
+      padding: 14px;
+    }
+
+    #network {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+        #fbfdff;
+      background-size: 40px 40px;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    }
+
+    .message {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(560px, calc(100% - 48px));
+      transform: translate(-50%, -50%);
+      padding: 22px;
+      border: 1px solid #fecdd3;
+      border-radius: 8px;
+      background: var(--danger-bg);
+      color: var(--danger);
+      box-shadow: 0 16px 36px rgba(127, 29, 29, 0.16);
+    }
+
+    .message h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .message p {
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: rgba(15, 23, 42, 0.08);
+      color: #7f1d1d;
+      font-size: 0.95em;
+    }
+
+    @media (max-width: 720px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px;
+      }
+
+      .stats {
+        justify-content: flex-start;
+        width: 100%;
+      }
+
+      .stat {
+        flex: 1 1 90px;
+      }
+
+      main {
+        padding: 10px;
+      }
+
+      #network {
+        height: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>SDN Network Topology</h1>
+        <div class="subtitle">Ryu REST API: http://127.0.0.1:8080 | Cập nhật: 2026-05-15 06:41:32</div>
+      </div>
+      <div class="stats" aria-label="Topology statistics">
+        <div class="stat"><strong id="switch-count">0</strong><span>Switches</span></div>
+        <div class="stat"><strong id="link-count">0</strong><span>Links</span></div>
+        <div class="stat"><strong id="host-count">0</strong><span>Hosts</span></div>
+      </div>
+    </header>
+    <main>
+      <div id="network"></div>
+      <div id="message" class="message" hidden></div>
+    </main>
+  </div>
+
+  <script>
+    const nodesData = [
+  {
+    "id": "controller",
+    "label": "Ryu Controller",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2212%22%20width%3D%2268%22%20height%3D%22104%22%20rx%3D%228%22%20fill%3D%22%230f8fbd%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2218%22%20y%3D%2230%22%20width%3D%2224%22%20height%3D%2278%22%20rx%3D%225%22%20fill%3D%22%230b79a3%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22/%3E%0A%3Cpath%20d%3D%22M50%2042h34M50%2062h34M50%2082h34%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22/%3E%0A%3Ccircle%20cx%3D%2229%22%20cy%3D%2247%22%20r%3D%224%22%20fill%3D%22%23ffffff%22/%3E%3Ccircle%20cx%3D%2229%22%20cy%3D%2269%22%20r%3D%224%22%20fill%3D%22%23ffffff%22/%3E%3Ccircle%20cx%3D%2229%22%20cy%3D%2291%22%20r%3D%224%22%20fill%3D%22%23ffffff%22/%3E%0A%3C/svg%3E",
+    "size": 42,
+    "level": 0,
+    "font": {
+      "size": 18,
+      "face": "Inter, Arial",
+      "color": "#0f172a"
+    },
+    "title": "Ryu Controller<br>REST API: 127.0.0.1:8080",
+    "x": 0,
+    "y": -280,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "switch:1",
+    "label": "s1",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20160%2096%22%3E%0A%3Crect%20x%3D%2212%22%20y%3D%2224%22%20width%3D%22136%22%20height%3D%2250%22%20rx%3D%228%22%20fill%3D%22%2318a7c9%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Cpath%20d%3D%22M30%2041h22M30%2057h22M66%2041h22M66%2057h22M102%2041h22M102%2057h22%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M33%2078l-13%2010m13-10l13%2010M80%2078v13M127%2078l-13%2010m13-10l13%2010%22%20stroke%3D%22%230f6f8f%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 46,
+    "level": 1,
+    "font": {
+      "size": 17,
+      "face": "Inter, Arial",
+      "color": "#0f172a"
+    },
+    "title": "Switch s1<br>DPID: 1<br>Ports: 16",
+    "x": 0.0,
+    "y": -80,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.1",
+    "label": "10.0.0.1",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.1<br>MAC: 00:00:00:00:00:01",
+    "x": -525.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.28",
+    "label": "10.0.0.28",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.28<br>MAC: 00:00:00:00:00:28",
+    "x": 225.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.27",
+    "label": "10.0.0.27",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.27<br>MAC: 00:00:00:00:00:27",
+    "x": 75.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.26",
+    "label": "10.0.0.26",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.26<br>MAC: 00:00:00:00:00:26",
+    "x": -75.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.25",
+    "label": "10.0.0.25",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.25<br>MAC: 00:00:00:00:00:25",
+    "x": -225.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.24",
+    "label": "10.0.0.24",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.24<br>MAC: 00:00:00:00:00:24",
+    "x": -375.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.23",
+    "label": "10.0.0.23",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.23<br>MAC: 00:00:00:00:00:23",
+    "x": -525.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.22",
+    "label": "10.0.0.22",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.22<br>MAC: 00:00:00:00:00:22",
+    "x": 525.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.21",
+    "label": "10.0.0.21",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.21<br>MAC: 00:00:00:00:00:21",
+    "x": 375.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.15",
+    "label": "10.0.0.15",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.15<br>MAC: 00:00:00:00:00:15",
+    "x": 225.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.14",
+    "label": "10.0.0.14",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.14<br>MAC: 00:00:00:00:00:14",
+    "x": 75.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.13",
+    "label": "10.0.0.13",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.13<br>MAC: 00:00:00:00:00:13",
+    "x": -75.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.12",
+    "label": "10.0.0.12",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.12<br>MAC: 00:00:00:00:00:12",
+    "x": -225.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.11",
+    "label": "10.0.0.11",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.11<br>MAC: 00:00:00:00:00:11",
+    "x": -375.0,
+    "y": 150,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.30",
+    "label": "10.0.0.30",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.30<br>MAC: 00:00:00:00:00:30",
+    "x": 525.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  },
+  {
+    "id": "host:10.0.0.29",
+    "label": "10.0.0.29",
+    "shape": "image",
+    "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20144%20112%22%3E%0A%3Crect%20x%3D%2230%22%20y%3D%2216%22%20width%3D%2284%22%20height%3D%2258%22%20rx%3D%226%22%20fill%3D%22%2327a8d8%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%226%22/%3E%0A%3Crect%20x%3D%2242%22%20y%3D%2227%22%20width%3D%2260%22%20height%3D%2236%22%20rx%3D%223%22%20fill%3D%22%23dff7ff%22/%3E%0A%3Cpath%20d%3D%22M20%2084h104l10%2014H10z%22%20fill%3D%22%23116f97%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22/%3E%0A%3Cpath%20d%3D%22M58%2090h28%22%20stroke%3D%22%23dff7ff%22%20stroke-width%3D%224%22%20stroke-linecap%3D%22round%22/%3E%0A%3C/svg%3E",
+    "size": 38,
+    "level": 2,
+    "font": {
+      "size": 15,
+      "face": "Inter, Arial",
+      "color": "#1e293b"
+    },
+    "title": "Host<br>IP: 10.0.0.29<br>MAC: 00:00:00:00:00:29",
+    "x": 375.0,
+    "y": 300,
+    "fixed": {
+      "x": true,
+      "y": true
+    }
+  }
+];
+    const edgesData = [
+  {
+    "from": "controller",
+    "to": "switch:1",
+    "dashes": true,
+    "width": 2,
+    "color": {
+      "color": "#0ea5e9",
+      "opacity": 0.75
+    },
+    "title": "Control channel: Ryu Controller -> Switch"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.1",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.1"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.28",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.28"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.27",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.27"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.26",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.26"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.25",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.25"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.24",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.24"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.23",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.23"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.22",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.22"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.21",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.21"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.15",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.15"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.14",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.14"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.13",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.13"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.12",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.12"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.11",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.11"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.30",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.30"
+  },
+  {
+    "from": "switch:1",
+    "to": "host:10.0.0.29",
+    "dashes": false,
+    "width": 2,
+    "color": {
+      "color": "#16a34a",
+      "opacity": 0.82
+    },
+    "title": "s1 <-> 10.0.0.29"
+  }
+];
+    const stats = {"switches": 1, "links": 17, "hosts": 16};
+    const errorMessage = "";
+
+    document.getElementById("switch-count").textContent = stats.switches;
+    document.getElementById("link-count").textContent = stats.links;
+    document.getElementById("host-count").textContent = stats.hosts;
+
+    if (errorMessage) {
+      const message = document.getElementById("message");
+      message.hidden = false;
+      message.innerHTML = `
+        <h2>Khong ket noi duoc Ryu Controller</h2>
+        <p>${errorMessage}</p>
+        <p>Hay kiem tra Ryu da chay voi REST app chua:</p>
+        <p><code>ryu-manager src/arp_monitor.py ryu.app.ofctl_rest</code></p>
+      `;
+    }
+
+    const container = document.getElementById("network");
+    const data = {
+      nodes: new vis.DataSet(nodesData),
+      edges: new vis.DataSet(edgesData)
+    };
+    const options = {
+      autoResize: true,
+      layout: {
+        improvedLayout: false
+      },
+      nodes: {
+        borderWidth: 0,
+        chosen: true,
+        shapeProperties: {
+          useBorderWithImage: false
+        },
+        shadow: {
+          enabled: true,
+          color: "rgba(15, 23, 42, 0.18)",
+          size: 12,
+          x: 0,
+          y: 5
+        }
+      },
+      edges: {
+        smooth: false,
+        selectionWidth: 2,
+        arrows: {
+          to: {
+            enabled: false
+          }
+        }
+      },
+      physics: {
+        enabled: false
+      },
+      interaction: {
+        hover: true,
+        tooltipDelay: 80,
+        dragNodes: false,
+        dragView: true,
+        zoomView: true,
+        navigationButtons: false,
+        keyboard: true
+      }
+    };
+
+    const network = new vis.Network(container, data, options);
+    requestAnimationFrame(() => {
+      network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } });
+    });
+  </script>
+</body>
+</html>

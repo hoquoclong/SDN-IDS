@@ -85,22 +85,22 @@ ryu-manager --version
 
 ```
 SDN-IDS/
-├── README.md                   # File này
+├── README.md                  # File này
 ├── alerts.log                 # File log alert (tự động tạo, không commit)
 ├── test_results.json          # Kết quả Precision/Recall (tự động tạo, không commit)
-├── pyproject.toml            # Cấu hình project
-├── .venv/                    # Virtual environment (Python 3.8)
+├── pyproject.toml             # Cấu hình project
+├── .venv/                     # Virtual environment (Python 3.8)
 ├── src/
-│   ├── topology.py          # Tạo mạng Mininet
-│   ├── topology_viewer.py   # Xem topo qua Ryu REST API
-│   ├── ids_detector.py      # IDS chính: polling, DDoS, Port Scan detection
-│   ├── mitigation.py        # Module chặn IP (Flow-Mod drop)
-│   ├── arp_monitor.py       # Ryu app phát hiện ARP Spoofing
-│   └── test_ids.py          # Đo Precision/Recall
+│   ├── topology.py            # Tạo mạng Mininet
+│   ├── topology_viewer.py     # Xem topo qua Ryu REST API
+│   ├── ids_detector.py        # IDS chính: polling, DDoS, Port Scan detection
+│   ├── mitigation.py          # Module chặn IP (Flow-Mod drop)
+│   ├── arp_monitor.py         # Ryu app phát hiện ARP Spoofing
+│   └── test_ids.py            # Đo Precision/Recall
 └── scripts/
-    ├── ddos.sh              # Script sinh DDoS (hping3)
-    ├── port_scan.sh         # Script sinh Port Scan (nmap)
-    └── arp_spoofing.sh      # Script sinh ARP Spoofing (arpspoof)
+    ├── ddos.sh                # Script sinh DDoS (hping3)
+    ├── port_scan.sh           # Script sinh Port Scan (nmap)
+    └── arp_spoofing.sh        # Script sinh ARP Spoofing (arpspoof)
 ```
 
 ---

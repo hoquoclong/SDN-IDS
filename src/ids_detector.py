@@ -71,6 +71,16 @@ def log(message, is_error=False):
     print(f"[{get_time()}] {prefix} {message}")
 
 
+def safe_int(value, default=0):
+    """Chuyển giá trị số từ Ryu REST API về int, kể cả khi API trả None."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def get_alert_log_file(log_file=None):
     return log_file or os.getenv(ALERT_LOG_FILE_ENV, ALERT_LOG_FILE)
 
@@ -239,9 +249,9 @@ def parse_flows(raw_flows):
         parsed.append({
             "src": src,
             "dst": dst,
-            "dst_port": int(dst_port) if dst_port else None,
-            "pkts": flow.get("packet_count", 0),
-            "bytes": flow.get("byte_count", 0),
+            "dst_port": safe_int(dst_port) if dst_port else None,
+            "pkts": safe_int(flow.get("packet_count")),
+            "bytes": safe_int(flow.get("byte_count")),
         })
         
     return parsed
@@ -278,8 +288,8 @@ def compute_delta_packets(current_flows, previous_state):
     for flow in current_flows:
         flow_key = (flow["src"], flow["dst"], flow.get("dst_port"))
         pair_key = (flow["src"], flow["dst"])
-        current_pkts = flow["pkts"]
-        prev_pkts = previous_state.get(flow_key, 0)
+        current_pkts = safe_int(flow.get("pkts"))
+        prev_pkts = safe_int(previous_state.get(flow_key))
 
         delta = max(current_pkts - prev_pkts, 0)
         if delta > 0:
@@ -389,12 +399,13 @@ def filter_significant_sources(source_counts, total_packets):
 
 def get_rate_scan_candidates(aggregated_pairs, window_seconds, protected_ips=None):
     """Tìm các cặp src -> protected dst có tốc độ giống port scan."""
-    if window_seconds <= 0:
+    if window_seconds is None or window_seconds <= 0:
         return {}
 
     protected_ips = get_protected_ips(protected_ips)
     candidates = {}
     for (src_ip, dst_ip), packets in aggregated_pairs.items():
+        packets = safe_int(packets)
         if src_ip in protected_ips or dst_ip not in protected_ips:
             continue
 
@@ -586,7 +597,7 @@ def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ip
         log(f"Bỏ qua Port Scan theo packet-rate vì đã phát hiện {ddos_result.get('attack_type')}.")
         return
 
-    if window_seconds <= 0:
+    if window_seconds is None or window_seconds <= 0:
         return
 
     scan_candidates = get_rate_scan_candidates(aggregated_pairs, window_seconds, protected_ips)
