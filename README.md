@@ -86,8 +86,8 @@ ryu-manager --version
 ```
 SDN-IDS/
 ├── README.md                   # File này
-├── alerts.log                 # File log alert (tự động tạo)
-├── test_results.json          # Kết quả Precision/Recall
+├── alerts.log                 # File log alert (tự động tạo, không commit)
+├── test_results.json          # Kết quả Precision/Recall (tự động tạo, không commit)
 ├── pyproject.toml            # Cấu hình project
 ├── .venv/                    # Virtual environment (Python 3.8)
 ├── src/
@@ -131,8 +131,16 @@ SDN-IDS/
 
 ### 4. Alert Log
 
-- Ghi log vào file `alerts.log` (JSON format)
-- Thông tin: timestamp, attack_type, attacker_ip, traffic volume, message
+- Ghi log vào file `alerts.log` theo JSON Lines (mỗi dòng là một JSON alert)
+- Field chuẩn luôn có: `timestamp`, `attack_type`, `attacker_ip`, `traffic_volume`, `traffic_unit`, `message`
+- Vẫn giữ các field chi tiết cũ để tương thích: `attacker_ips`, `total_packets`, `victim_ip`, `ports_scanned`, `claimed_ip`, `src_mac`, `trusted_mac`
+- Có thể đổi vị trí log bằng biến môi trường `IDS_ALERT_LOG_FILE`
+
+Ví dụ:
+
+```json
+{"timestamp":"2026-05-15 10:00:00","attack_type":"DoS","attacker_ip":"10.0.0.21","traffic_volume":1500,"traffic_unit":"packets","message":"DoS detected! Victim=10.0.0.1, Src_Ent=0.0000, Dst_Ent=0.0000"}
+```
 
 ---
 
@@ -186,6 +194,7 @@ python3.8 src/ids_detector.py
 - Polling mỗi 5 giây lấy flow stats
 - Phát hiện DDoS (entropy) và Port Scan (port counting)
 - Tự động chặn attacker qua Flow-Mod
+- Có thể tắt mitigation khi đo kiểm bằng `IDS_DISABLE_MITIGATION=1`
 - Victim/server được bảo vệ mặc định là `10.0.0.1`. Có thể đổi hoặc cấu hình nhiều victim bằng biến môi trường:
 
 ```bash
@@ -243,5 +252,24 @@ Lưu ý: với topology hiện tại, nên spoof một IP có trong bảng tin c
 - IDS console: Xem alert realtime của DDoS/Port Scan
 - Ryu console: Xem alert realtime của ARP Spoofing
 - File `alerts.log`: Xem toàn bộ alerts (JSON format), bao gồm ARP Spoofing. Lưu ý `ids_detector.py` không in alert ARP vì ARP được xử lý trực tiếp trong Ryu app `src/arp_monitor.py`.
+
+### Bước 8: Đo Precision/Recall live
+
+Chạy Ryu Controller trước ở thư mục project, sau đó chạy evaluator ở terminal khác:
+
+```bash
+sudo python3.8 src/test_ids.py --output test_results.json
+```
+
+Evaluator sẽ tự tạo Mininet topology, tự chạy IDS với `IDS_DISABLE_MITIGATION=1`, chạy các kịch bản benign, DoS, DDoS phân tán, Port Scan, Port Scan Rate, ARP Spoofing và ARP Unknown Binding, rồi ghi kết quả vào `test_results.json`.
+
+Metric được tính theo cặp `(attack_type, attacker_ip)` sau khi loại alert trùng:
+
+- `TP = expected ∩ observed`
+- `FP = observed - expected`
+- `FN = expected - observed`
+- Báo cáo `precision`, `recall`, `f1` theo từng loại tấn công và toàn cục
+
+Nếu Ryu flow stats không expose `tcp_dst/udp_dst`, scenario `port_scan` theo số port sẽ được đánh dấu `skipped` và không tính vào metric; scenario `port_scan_rate` vẫn được chạy.
 
 ---

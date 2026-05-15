@@ -6,6 +6,10 @@ dist/
 wheels/
 *.egg-info/
 
+# Runtime outputs
+alerts.log
+test_results.json
+
 # Virtual environments
 .venv/
 

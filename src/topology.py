@@ -84,44 +84,38 @@ def verify_connectivity(hosts_dict):
 # ============================================================================
 #  XÂY DỰNG TOPOLOGY
 # ============================================================================
-def ids_topology():
-	"""Tạo, khởi động và mở CLI Mininet"""
+def build_ids_network():
+	"""Tạo topology Mininet và trả về net, hosts nhưng chưa start."""
 	info("*** Dang khoi tao topo Mininet cho SDN-IDS\n")
 
 	net = Mininet(
-		controller=RemoteController, 
-		switch=OVSKernelSwitch, 
-		link=TCLink, 
+		controller=RemoteController,
+		switch=OVSKernelSwitch,
+		link=TCLink,
 		build=False,
 		autoStaticArp=False
 	)
 
-	# 1. Khởi tạo Controller từ Ryu
 	net.addController(
 		"Ryu_controller",
 		controller=RemoteController,
 		ip="127.0.0.1",
 		port=6633,
 	)
-	info(f"*** Da cau hinh RemoteController: 127.0.0.1:6633 (Ryu_controller)\n")
+	info("*** Da cau hinh RemoteController: 127.0.0.1:6633 (Ryu_controller)\n")
 
-	# 2. Khởi tạo Switch trung tâm
 	core_switch = net.addSwitch("s1", cls=OVSKernelSwitch, protocols="OpenFlow13")
-	info(f"*** Da them core switch: s1 (OpenFlow13)\n")
+	info("*** Da them core switch: s1 (OpenFlow13)\n")
 
 	host_objects = {}
-
-	# 3. Tạo Host và Link dựa trên map_hosts
 	for host_name, ip_suffix in map_hosts():
 		host_ip = get_ip(ip_suffix)
 		host_mac = get_mac(ip_suffix)
 
-		# 1. Tạo tất cả host từ danh sách
 		host = net.addHost(host_name, ip=host_ip, mac=host_mac)
 		host_objects[host_name] = host
 		info(f"*** Da them host {host_name}: IP={host_ip}, MAC={host_mac}\n")
 
-		# 2. Kết nối mọi host với switch trung tâm với băng thông và độ trễ theo vai trò
 		link_config = LINK_CONFIG.get(host_name.split('_')[0])
 		if link_config:
 			net.addLink(host, core_switch, bw=link_config['bw'], delay=link_config['delay'])
@@ -129,27 +123,41 @@ def ids_topology():
 			net.addLink(host, core_switch, bw=100)
 		info(f"*** Da ket noi {host_name} <-> s1\n")
 
-	# 4. Build và Start mạng
+	return net, host_objects
+
+
+def start_ids_network(verify=True, wait_seconds=3):
+	"""Build/start topology để CLI hoặc live evaluator dùng lại."""
+	net, host_objects = build_ids_network()
+
 	info("*** Xay dung va khoi dong mang\n")
 	net.build()
 	net.start()
 
-	info("*** Dang cho Switch s1 ket noi voi Ryu Controller (3s)...\n")
-	time.sleep(3)
+	info(f"*** Dang cho Switch s1 ket noi voi Ryu Controller ({wait_seconds}s)...\n")
+	time.sleep(wait_seconds)
 
-	# 5. In Port Mapping
 	info('\nPort mapping tren Switch s1:\n')
 	for i, (name, host) in enumerate(host_objects.items(), start=1):
 		info(f'    Port {i:2d} -> {name:8s} ({host.IP()})\n')
 
-	# 6. Kiểm tra kết nối
-	verify_connectivity(host_objects)
+	if verify:
+		verify_connectivity(host_objects)
 
-	info("*** Mininet da khoi dong. Dang vao CLI (go 'exit' de dung).\n")
-	CLI(net)
+	return net, host_objects
 
-	info("*** Dang dung Mininet\n")
-	net.stop()
+
+def ids_topology():
+	"""Tạo, khởi động và mở CLI Mininet."""
+	net = None
+	try:
+		net, _ = start_ids_network(verify=True)
+		info("*** Mininet da khoi dong. Dang vao CLI (go 'exit' de dung).\n")
+		CLI(net)
+	finally:
+		if net is not None:
+			info("*** Dang dung Mininet\n")
+			net.stop()
 
 if __name__ == "__main__":
 	setLogLevel("info")

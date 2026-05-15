@@ -9,8 +9,9 @@ import math
 import sys
 import codecs
 import os
+import json
 import ipaddress
-     
+
 from datetime import datetime
 from collections import defaultdict, deque
 
@@ -18,34 +19,16 @@ if sys.stdout.encoding != 'utf-8':
     if hasattr(sys.stdout, 'buffer'):
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
 
+MITIGATION_DISABLED_ENV = "IDS_DISABLE_MITIGATION"
+
 # Import module mitigation để tự động chặn attacker
 try:
     from mitigation import block_ip, log as mitig_log
-    MITIGATION_ENABLED = True
+    MITIGATION_ENABLED = os.getenv(MITIGATION_DISABLED_ENV, "").strip().lower() not in {"1", "true", "yes", "on"}
 except ImportError:
     MITIGATION_ENABLED = False
     def block_ip(*args, **kwargs) -> bool: return False
     def mitig_log(*args, **kwargs): pass
-
-# ============================================================================
-# CẤU HÌNH ALERT LOG
-# ============================================================================
-
-ALERT_LOG_FILE = "alerts.log"
-
-def write_alert_log(alert_data):
-    """
-    Ghi alert vào file alerts.log (append mode, JSON format).
-    
-    Args:
-        alert_data: dict chứa thông tin alert
-    """
-    import json
-    try:
-        with open(ALERT_LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(alert_data, ensure_ascii=False) + '\n')
-    except IOError as e:
-        log(f"Lỗi ghi alert log: {e}", is_error=True)
 
 # ============================================================================
 # CẤU HÌNH HỆ THỐNG
@@ -56,6 +39,9 @@ POLL_INTERVAL = 5
 TIMEOUT = 10
 DEFAULT_PROTECTED_IPS = {"10.0.0.1"}
 PROTECTED_IPS_ENV = "IDS_PROTECTED_IPS"
+ALERT_LOG_FILE = "alerts.log"
+ALERT_LOG_FILE_ENV = "IDS_ALERT_LOG_FILE"
+DEFAULT_TRAFFIC_UNIT = "packets"
 
 # Cấu hình phát hiện DDoS
 MIN_TRAFFIC_VOL = 50       # Ngưỡng tối thiểu tổng packets để phân tích
@@ -83,6 +69,85 @@ def log(message, is_error=False):
     """In thông báo ra console kèm dấu thời gian."""
     prefix = "✖ LỖI:" if is_error else "! INFO:"
     print(f"[{get_time()}] {prefix} {message}")
+
+
+def get_alert_log_file(log_file=None):
+    return log_file or os.getenv(ALERT_LOG_FILE_ENV, ALERT_LOG_FILE)
+
+
+def _first_attacker_ip(alert_data):
+    attacker_ip = alert_data.get("attacker_ip")
+    if attacker_ip:
+        return attacker_ip
+
+    attacker_ips = alert_data.get("attacker_ips") or []
+    for item in attacker_ips:
+        if isinstance(item, dict) and item.get("ip"):
+            return item["ip"]
+        if isinstance(item, str) and item:
+            return item
+    return None
+
+
+def _traffic_volume(alert_data):
+    for key in ("traffic_volume", "packets", "total_packets"):
+        value = alert_data.get(key)
+        if value is not None:
+            return value
+    return 0
+
+
+def normalize_alert(alert_data):
+    """Chuẩn hóa alert nhưng vẫn giữ các field chi tiết cũ."""
+    alert = dict(alert_data)
+    attack_type = alert.get("attack_type") or "UNKNOWN"
+    attacker_ip = _first_attacker_ip(alert)
+    traffic_volume = _traffic_volume(alert)
+    message = alert.get("message") or f"{attack_type} detected"
+
+    normalized = {
+        "timestamp": alert.get("timestamp") or get_time(),
+        "attack_type": attack_type,
+        "attacker_ip": attacker_ip,
+        "traffic_volume": traffic_volume,
+        "traffic_unit": alert.get("traffic_unit") or DEFAULT_TRAFFIC_UNIT,
+        "message": message,
+    }
+
+    for key, value in alert.items():
+        if key not in normalized:
+            normalized[key] = value
+    return normalized
+
+
+def write_alert_log(alert_data):
+    """Ghi alert đã chuẩn hóa vào alerts.log."""
+    try:
+        normalized = normalize_alert(alert_data)
+        with open(get_alert_log_file(), "a", encoding="utf-8") as f:
+            f.write(json.dumps(normalized, ensure_ascii=False) + "\n")
+        return normalized
+    except IOError as e:
+        log(f"Lỗi ghi alert log: {e}", is_error=True)
+        return None
+
+
+def read_alert_log(log_file=None):
+    path = get_alert_log_file(log_file)
+    if not os.path.exists(path):
+        return []
+
+    alerts = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                alerts.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return alerts
 
 
 def load_protected_ips(env_value=None):
@@ -427,11 +492,15 @@ def analyze_ddos(sliding_window, all_flows=None, protected_ips=None, blocked_ips
             print(f"  {ip:<20} {pkts:>10,} {ratio:>9.1f}% {note}")
         
         # Ghi alert log
+        top_attacker_ip = sorted_ips[0][0] if sorted_ips else None
         alert_data = {
             "timestamp": get_time(),
             "attack_type": attack_type,
+            "attacker_ip": top_attacker_ip,
             "victim_ip": victim_ip,
             "attacker_ips": [{"ip": ip, "packets": pkts} for ip, pkts in sorted_ips[:3]],
+            "traffic_volume": victim_packets,
+            "traffic_unit": "packets",
             "total_packets": total_packets,
             "src_entropy": round(src_entropy, 4),
             "dst_entropy": round(dst_entropy, 4),
@@ -458,6 +527,12 @@ def analyze_ddos(sliding_window, all_flows=None, protected_ips=None, blocked_ips
 def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ips=None, blocked_ips=None):
     """Phát hiện Port Scan bằng số port, fallback bằng tốc độ gói tin theo cặp src -> dst."""
     protected_ips = get_protected_ips(protected_ips)
+    aggregated_pairs = {}
+    window_seconds = None
+    if sliding_window:
+        _, _, aggregated_pairs = aggregate_window(sliding_window)
+        window_seconds = len(sliding_window) * POLL_INTERVAL
+
     # Gom nhóm dst_port theo cặp (src_ip, dst_ip)
     src_dst_ports = defaultdict(set)
     detected_pairs = set()
@@ -473,6 +548,7 @@ def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ip
     # Phát hiện port scan
     for (src_ip, dst_ip), ports in src_dst_ports.items():
         if len(ports) >= PORT_SCAN_THRESHOLD:
+            packets = aggregated_pairs.get((src_ip, dst_ip), 0)
             print(f"\n{'=' * 65}")
             print(f"  [PORT SCAN DETECTED] Nguồn: {src_ip} -> Đích: {dst_ip}")
             print(f"  Số lượng cổng đích quét: {len(ports)} (Ngưỡng: {PORT_SCAN_THRESHOLD})")
@@ -491,9 +567,11 @@ def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ip
                 "attack_type": "Port_Scan",
                 "attacker_ip": src_ip,
                 "victim_ip": dst_ip,
-                "packets": None,
+                "traffic_volume": packets,
+                "traffic_unit": "packets",
+                "packets": packets,
                 "pps": None,
-                "window_seconds": None,
+                "window_seconds": window_seconds,
                 "detection_method": "port_count",
                 "ports_scanned": sorted(list(ports)),
                 "num_ports": len(ports),
@@ -508,8 +586,6 @@ def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ip
         log(f"Bỏ qua Port Scan theo packet-rate vì đã phát hiện {ddos_result.get('attack_type')}.")
         return
 
-    _, _, aggregated_pairs = aggregate_window(sliding_window)
-    window_seconds = len(sliding_window) * POLL_INTERVAL
     if window_seconds <= 0:
         return
 
@@ -537,6 +613,8 @@ def analyze_port_scan(flows, sliding_window=None, ddos_result=None, protected_ip
             "attack_type": "Suspected_Port_Scan_Rate",
             "attacker_ip": src_ip,
             "victim_ip": dst_ip,
+            "traffic_volume": packets,
+            "traffic_unit": "packets",
             "packets": packets,
             "pps": round(pps, 2),
             "window_seconds": window_seconds,
@@ -561,8 +639,9 @@ def main():
     print(f" Ngưỡng Entropy             : {ENTROPY_THRESHOLD}")
     print(f" Ngưỡng Traffic tối thiểu   : {MIN_TRAFFIC_VOL} pkts")
     print(f" Ngưỡng Traffic cảnh báo    : {DDOS_TRAFFIC_VOL} pkts")
-    print(f" Ngưỡng Port Scan           : {PORT_SCAN_THRESHOLD} ports")
-    print(f" Ngưỡng Port Scan fallback  : {PORT_SCAN_PPS_THRESHOLD}-{PORT_SCAN_MAX_PPS} pps / {PORT_SCAN_MIN_PACKETS} pkts")
+    print(f" Ngưỡng Port Scan           : {PORT_SCAN_PPS_THRESHOLD}-{PORT_SCAN_MAX_PPS} pps / {PORT_SCAN_MIN_PACKETS} pkts")
+    print(f" Alert log                  : {ALERT_LOG_FILE}")
+    print(f" Mitigation                 : {'enabled' if MITIGATION_ENABLED else 'disabled'}")
     print("=" * 65 + "\n")
 
     # Trạng thái lưu packet_count của chu kỳ trước

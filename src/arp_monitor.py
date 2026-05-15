@@ -4,12 +4,17 @@ arp_monitor.py - Ryu app phát hiện ARP Spoofing
 Chạy: ryu-manager arp_monitor.py ryu.app.ofctl_rest ryu.app.rest.topology
 """
 
+import os
+import sys
+
 from ryu.base import app_manager
 from ryu.controller import ofp_event
 from ryu.controller.handler import MAIN_DISPATCHER, CONFIG_DISPATCHER, set_ev_cls
 from ryu.ofproto import ofproto_v1_3
 from ryu.lib.packet import packet, ethernet, arp
-from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ids_detector import get_time, write_alert_log
 
 
 # Bảng MAC-IP tin cậy (từ topology.py)
@@ -33,11 +38,6 @@ TRUSTED = {
 }
 
 alerts = []
-
-
-def get_time():
-    """Trả về chuỗi thời gian hiện tại."""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def mac_to_ip(mac):
@@ -133,6 +133,8 @@ class ARPMonitor(app_manager.RyuApp):
             "timestamp": get_time(),
             "attack_type": attack_type,
             "attacker_ip": attacker_ip,
+            "traffic_volume": 1,
+            "traffic_unit": "packets",
             "claimed_ip": claimed_ip,
             "src_mac": src_mac,
             "trusted_mac": trusted_mac,
@@ -140,16 +142,12 @@ class ARPMonitor(app_manager.RyuApp):
         }
 
     def emit_alert(self, alert):
-        alerts.append(alert)
-        self.logger.warning("%s: %s", alert["attack_type"], alert)
-
-        # Ghi vào file alerts.log
         try:
-            import json
-            with open("alerts.log", "a", encoding="utf-8") as f:
-                f.write(json.dumps(alert, ensure_ascii=False) + "\n")
+            alert = write_alert_log(alert)
         except IOError:
             self.logger.error("Failed to write ARP alert to log file")
+        alerts.append(alert)
+        self.logger.warning("%s: %s", alert["attack_type"], alert)
 
     def get_alerts(self):
         return alerts
